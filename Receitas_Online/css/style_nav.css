@@ -1,0 +1,111 @@
+/* Menu de Navegação */
+.navbar {
+    background-color: #4e342e;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.logo {
+    color: white;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+.nav-links {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    gap: 20px;
+}
+
+.nav-links li a {
+    color: white;
+    text-decoration: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+}
+
+.nav-links li a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Menu Hamburguer - Escondido no Desktop */
+.menu-toggle-input {
+    display: none;
+}
+
+.menu-icon {
+    display: none;
+    flex-direction: column;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.bar {
+    width: 25px;
+    height: 3px;
+    background-color: white;
+    margin: 3px 0;
+    transition: 0.3s;
+    border-radius: 2px;
+}
+
+/* Responsividade - Mobile */
+@media (max-width: 768px) {
+    .menu-icon {
+        display: flex;
+        z-index: 1001;
+    }
+    
+    .nav-links {
+        position: fixed;
+        top: 0;
+        right: -100%;
+        width: 250px;
+        height: 100vh;
+        background-color: #5d4037;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: flex-start;
+        padding-top: 80px;
+        padding-left: 30px;
+        transition: right 0.3s ease-in-out;
+        z-index: 1000;
+        box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .nav-links li {
+        margin: 15px 0;
+    }
+    
+    .nav-links li a {
+        font-size: 1.1rem;
+        padding: 10px 15px;
+        display: block;
+        width: 100%;
+    }
+    
+    /* Quando o checkbox está marcado, mostra o menu */
+    .menu-toggle-input:checked ~ .nav-links {
+        right: 0;
+    }
+    
+    /* Animação do ícone hamburguer para X */
+    .menu-toggle-input:checked ~ .menu-icon .bar:nth-child(1) {
+        transform: rotate(-45deg) translate(-5px, 6px);
+    }
+    
+    .menu-toggle-input:checked ~ .menu-icon .bar:nth-child(2) {
+        opacity: 0;
+    }
+    
+    .menu-toggle-input:checked ~ .menu-icon .bar:nth-child(3) {
+        transform: rotate(45deg) translate(-5px, -6px);
+    }
+}
