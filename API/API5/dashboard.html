@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="pt-BR">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>API Usuários — Painel</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>
+            body { padding-top: 2rem; }
+            .table-actions button { margin-right: 0.25rem; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <h1 class="h3 mb-0">Painel — Usuários</h1>
+                <div>
+                    <button id="btnAdd" class="btn btn-primary">Adicionar Usuário</button>
+                </div>
+            </div>
+
+            <div id="alertPlaceholder"></div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle" id="usuariosTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:6%">ID</th>
+                                    <th>Nome</th>
+                                    <th>Email</th>
+                                    <th style="width:18%">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usuariosBody">
+                                <!-- linhas preenchidas por JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: criar / editar -->
+        <div class="modal fade" id="userModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalTitle">Novo usuário</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <form id="userForm">
+                        <div class="modal-body">
+                            <input type="hidden" id="userId">
+                            <div class="mb-3">
+                                <label for="nome" class="form-label">Nome</label>
+                                <input type="text" class="form-control" id="nome" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="email" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="senha" class="form-label">Senha</label>
+                                <input type="password" class="form-control" id="senha" minlength="6">
+                                <div class="form-text">Defina uma senha (mínimo 6 caracteres). Ao editar, deixe em branco para manter a atual.</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Salvar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: confirmar exclusão -->
+        <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-sm modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-body text-center py-4">
+                        <p class="mb-3">Tem certeza que deseja remover este usuário?</p>
+                        <div class="d-flex justify-content-center gap-2">
+                            <button id="cancelDelete" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button id="confirmDelete" class="btn btn-danger">Remover</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            const apiBase = 'http://localhost:3000/usuarios';
+            let deleteCandidateId = null;
+
+            const userModal = new bootstrap.Modal(document.getElementById('userModal'));
+            const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+
+            document.getElementById('btnAdd').addEventListener('click', () => openCreate());
+            document.getElementById('userForm').addEventListener('submit', handleSave);
+            document.getElementById('confirmDelete').addEventListener('click', handleDeleteConfirmed);
+
+            async function carregarUsuarios() {
+                setAlert();
+                const tbody = document.getElementById('usuariosBody');
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4">Carregando...</td></tr>';
+                try {
+                    const res = await fetch(apiBase);
+                    if (!res.ok) throw new Error('Falha ao buscar usuários');
+                    const dados = await res.json();
+                    tbody.innerHTML = '';
+                    if (!Array.isArray(dados) || dados.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum usuário encontrado</td></tr>';
+                        return;
+                    }
+                    dados.forEach(u => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${u.id ?? ''}</td>
+                            <td>${escapeHtml(u.nome ?? '')}</td>
+                            <td>${escapeHtml(u.email ?? '')}</td>
+                            <td class="table-actions">
+                                <button class="btn btn-sm btn-outline-secondary" onclick='openEdit(${JSON.stringify(u)})'>Editar</button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="askDelete(${u.id})">Remover</button>
+                            </td>`;
+                        tbody.appendChild(tr);
+                    });
+                } catch (err) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Erro ao carregar usuários</td></tr>';
+                    setAlert('danger', err.message || 'Erro desconhecido');
+                }
+            }
+
+            function openCreate() {
+                document.getElementById('modalTitle').textContent = 'Novo usuário';
+                document.getElementById('userId').value = '';
+                document.getElementById('nome').value = '';
+                document.getElementById('email').value = '';
+                document.getElementById('senha').value = '';
+                userModal.show();
+            }
+
+            function openEdit(user) {
+                document.getElementById('modalTitle').textContent = 'Editar usuário';
+                document.getElementById('userId').value = user.id || '';
+                document.getElementById('nome').value = user.nome || '';
+                document.getElementById('email').value = user.email || '';
+                document.getElementById('senha').value = '';
+                userModal.show();
+            }
+
+            async function handleSave(e) {
+                e.preventDefault();
+                const id = document.getElementById('userId').value;
+                const nome = document.getElementById('nome').value.trim();
+                const email = document.getElementById('email').value.trim();
+                const senha = document.getElementById('senha').value;
+
+                if (!nome || !email) {
+                    setAlert('warning', 'Nome e email são obrigatórios.');
+                    return;
+                }
+
+                const payload = { nome, email };
+                if (senha) payload.senha = senha;
+
+                try {
+                    const opts = id ? { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) }
+                                                     : { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) };
+                    const url = id ? `${apiBase}/${id}` : apiBase;
+                    const res = await fetch(url, opts);
+                    if (!res.ok) {
+                        const errText = await res.text();
+                        throw new Error(errText || 'Erro ao salvar usuário');
+                    }
+                    setAlert('success', id ? 'Usuário atualizado.' : 'Usuário criado.');
+                    userModal.hide();
+                    carregarUsuarios();
+                } catch (err) {
+                    setAlert('danger', err.message || 'Erro desconhecido ao salvar.');
+                }
+            }
+
+            function askDelete(id) {
+                deleteCandidateId = id;
+                confirmModal.show();
+            }
+
+            async function handleDeleteConfirmed() {
+                if (!deleteCandidateId) return;
+                try {
+                    const res = await fetch(`${apiBase}/${deleteCandidateId}`, { method: 'DELETE' });
+                    if (!res.ok) throw new Error('Falha ao remover usuário');
+                    setAlert('success', 'Usuário removido.');
+                    confirmModal.hide();
+                    carregarUsuarios();
+                } catch (err) {
+                    setAlert('danger', err.message || 'Erro ao remover.');
+                } finally {
+                    deleteCandidateId = null;
+                }
+            }
+
+            function setAlert(type, message) {
+                const placeholder = document.getElementById('alertPlaceholder');
+                if (!type) { placeholder.innerHTML = ''; return; }
+                const wrapper = document.createElement('div');
+                wrapper.innerHTML = `\n          <div class="alert alert-${type} alert-dismissible" role="alert">\n            ${escapeHtml(message)}\n            <button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"alert\" aria-label=\"Close\"></button>\n          </div>`;
+                placeholder.innerHTML = '';
+                placeholder.appendChild(wrapper);
+            }
+
+            function escapeHtml(text) {
+                return text
+                    .replaceAll('&', '&amp;')
+                    .replaceAll('<', '&lt;')
+                    .replaceAll('>', '&gt;')
+                    .replaceAll('"', '&quot;')
+                    .replaceAll("'", '&#039;');
+            }
+
+            // Inicialização
+            carregarUsuarios();
+        </script>
+    </body>
+</html>
